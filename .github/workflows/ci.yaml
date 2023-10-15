@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [ main, master ]
   pull_request:
-    branches: [main, master]
+    branches: [ main, master ]
 
 env:
   REGISTRY: "cr.selcloud.ru/microservices"
@@ -23,13 +23,14 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Login to Docker Registry
-        uses: docker login -u ${{ secrets.REGISTRY_USERNAME }} -p ${{ secrets.REGISTRY_PASSWORD }} $REGISTRY
+        run: docker login -u ${{ secrets.REGISTRY_USERNAME }} -p ${{ secrets.REGISTRY_PASSWORD }} $REGISTRY
 
       - name: Build and Push Docker Image
-        uses: |
+        run: |
           TAG_NAME=$(echo $GITHUB_SHA | head -c7)
           docker buildx create --use
           docker buildx build --no-cache --push --tag $REGISTRY/$IMAGE_NAME:$TAG_NAME .
+
   deploy-image:
     runs-on: ubuntu-22.04
     needs: image-build-and-push
@@ -42,7 +43,7 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           envs: IMAGE_NAME,REGISTRY,GITHUB_SHA,CONTAINER_NAME
-          scripts: |
+          script: |
             TAG_NAME=$(echo $GITHUB_SHA | head -c7)
             
             docker login -u ${{ secrets.REGISTRY_USERNAME }} -p ${{ secrets.REGISTRY_PASSWORD }} $REGISTRY
@@ -51,4 +52,4 @@ jobs:
             
             docker rm $CONTAINER_NAME
             
-            docker run -d -p 50051:50051 --name $CONTAINER_NAME -t $REGISTRY/$IMAGE_NAME
+            docker run -d -p 50051:50051 --name $CONTAINER_NAME -t $REGISTRY/$IMAGE_NAME:$TAG_NAME
