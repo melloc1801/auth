@@ -31,7 +31,7 @@ func (s *server) Create(ctx context.Context, req *desc.CreateUserRequest) (*desc
 
 	pool, err := pgx.Connect(ctx, dbDSN)
 	if err != nil {
-		log.Fatalf("failed to connect to database", err.Error())
+		log.Fatalf("failed to connect to database %v", err.Error())
 	}
 
 	insertBuilder := squirrel.Insert("\"user\"").
