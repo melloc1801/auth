@@ -1,12 +1,12 @@
 package user
 
 import (
+	"auth/internal/client/db"
 	"auth/internal/repository"
 	"auth/internal/repository/user/model"
 	"context"
 	"errors"
 	"github.com/Masterminds/squirrel"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"time"
 )
 
@@ -23,10 +23,10 @@ const (
 )
 
 type repo struct {
-	db *pgxpool.Pool
+	db db.Client
 }
 
-func NewRepository(db *pgxpool.Pool) repository.UserRepository {
+func NewRepository(db db.Client) repository.UserRepository {
 	return &repo{
 		db: db,
 	}
@@ -45,7 +45,7 @@ func (r *repo) Create(ctx context.Context, userInfo *model.CreateUserInfo) (int6
 	}
 
 	var id int64
-	err = r.db.QueryRow(ctx, query, args...).Scan(&id)
+	err = r.db.DB().ScanOneRow(ctx, &id, db.Query{Name: "Insert user", QueryString: query}, args...)
 	if err != nil {
 		return 0, errors.New("failed to make query")
 	}
@@ -72,7 +72,7 @@ func (r *repo) Get(ctx context.Context, id int64) (*model.User, error) {
 	}
 
 	var user = &model.User{}
-	err = r.db.QueryRow(ctx, query, args...).Scan(&user.Id, &user.Name, &user.Email, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+	err = r.db.DB().ScanOneRow(ctx, &user, db.Query{Name: "Select user", QueryString: query}, args...)
 	if err != nil {
 		return nil, errors.New("failed to make query")
 	}
@@ -94,7 +94,7 @@ func (r *repo) Update(ctx context.Context, updateUserInfo *model.UpdateUserInfo)
 		return errors.New("failed to build query")
 	}
 
-	_, err = r.db.Exec(ctx, query, args...)
+	_, err = r.db.DB().Exec(ctx, db.Query{Name: "Update user", QueryString: query}, args...)
 	if err != nil {
 		return errors.New("failed to executed query")
 	}
@@ -111,7 +111,7 @@ func (r *repo) Delete(ctx context.Context, id int64) error {
 	if err != nil {
 		return errors.New("failed to build query")
 	}
-	_, err = r.db.Exec(ctx, query, args...)
+	_, err = r.db.DB().Exec(ctx, db.Query{Name: "Update user", QueryString: query}, args...)
 	if err != nil {
 		return errors.New("failed to execute")
 	}

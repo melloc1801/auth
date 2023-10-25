@@ -82,8 +82,8 @@ func (pg *pg) Close() {
 func logQuery(ctx context.Context, q db.Query, args ...interface{}) {
 	prettyQuery := prettier.Pretty(q.QueryString, prettier.PlaceholderDollar, args...)
 	log.Println(
-		ctx,
-		fmt.Sprintf("sql: %s", q.Name),
-		fmt.Sprintf("query: %s", prettyQuery),
+		fmt.Sprintf("context: %s \n", ctx),
+		fmt.Sprintf("sql: %s \n", q.Name),
+		fmt.Sprintf("query: %s \n", prettyQuery),
 	)
 }

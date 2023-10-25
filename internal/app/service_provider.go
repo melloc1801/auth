@@ -2,6 +2,8 @@ package app
 
 import (
 	"auth/internal/api"
+	"auth/internal/client/db"
+	"auth/internal/client/db/pg"
 	"auth/internal/closer"
 	"auth/internal/config"
 	"auth/internal/repository"
@@ -9,7 +11,6 @@ import (
 	"auth/internal/service"
 	userService "auth/internal/service/user"
 	"context"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"log"
 )
 
@@ -17,7 +18,7 @@ type serviceProvider struct {
 	pgConfig   config.PGConfig
 	grpcConfig config.GRPCConfig
 
-	pg             *pgxpool.Pool
+	pg             db.Client
 	userRepository repository.UserRepository
 
 	userService service.UserService
@@ -53,25 +54,21 @@ func (s *serviceProvider) PgConfig() config.PGConfig {
 	return s.pgConfig
 }
 
-func (s *serviceProvider) DBClient(ctx context.Context) *pgxpool.Pool {
+func (s *serviceProvider) DBClient(ctx context.Context) db.Client {
 	if s.pg == nil {
-		pool, err := pgxpool.Connect(ctx, s.PgConfig().DSN())
+		cl, err := pg.NewPgClient(ctx, s.PgConfig().DSN())
 		if err != nil {
 			log.Fatalf("failed to connect to database: %v", err)
 		}
 
-		err = pool.Ping(ctx)
+		err = cl.DB().Ping(ctx)
 		if err != nil {
 			log.Fatalf("ping error: %s", err)
 		}
 
-		closer.Add(func() error {
-			pool.Close()
+		closer.Add(cl.Close)
 
-			return nil
-		})
-
-		s.pg = pool
+		s.pg = cl
 	}
 
 	return s.pg
