@@ -23,9 +23,7 @@ type server struct {
 }
 
 func (s *server) Create(ctx context.Context, req *desc.CreateUserRequest) (*desc.CreateUserResponse, error) {
-	name, email, role, password, passwordConfirm :=
-		req.User.Name, req.User.Email, req.User.Role, req.User.Password, req.User.PasswordConfirm
-	if password != passwordConfirm {
+	if req.User.Password != req.User.PasswordConfirm {
 		log.Fatalf("passwords are not equal")
 	}
 
@@ -37,7 +35,7 @@ func (s *server) Create(ctx context.Context, req *desc.CreateUserRequest) (*desc
 	insertBuilder := squirrel.Insert("\"user\"").
 		PlaceholderFormat(squirrel.Dollar).
 		Columns("name", "email", "role", "password").
-		Values(name, email, role.String(), password).
+		Values(req.User.Name, req.User.Email, req.User.Role.String(), req.User.Password).
 		Suffix("RETURNING id")
 
 	query, args, err := insertBuilder.ToSql()
@@ -57,8 +55,6 @@ func (s *server) Create(ctx context.Context, req *desc.CreateUserRequest) (*desc
 }
 
 func (s *server) Get(ctx context.Context, req *desc.GetUserRequest) (*desc.GetUserResponse, error) {
-	id := req.Id
-
 	pool, err := pgx.Connect(ctx, dbDSN)
 	if err != nil {
 		log.Fatalf("Failed to connect to database")
@@ -67,7 +63,7 @@ func (s *server) Get(ctx context.Context, req *desc.GetUserRequest) (*desc.GetUs
 	selectBuilder := squirrel.Select("id", "name", "email", "role", "created_at", "updated_at").
 		PlaceholderFormat(squirrel.Dollar).
 		From("\"user\"").
-		Where(squirrel.Eq{"id": id})
+		Where(squirrel.Eq{"id": req.Id})
 
 	query, args, err := selectBuilder.ToSql()
 	if err != nil {
@@ -137,8 +133,6 @@ func (s *server) Update(ctx context.Context, req *desc.UpdateUserRequest) (*empt
 }
 
 func (s *server) Delete(ctx context.Context, req *desc.DeleteUserRequest) (*empty.Empty, error) {
-	id := req.Id
-
 	pool, err := pgx.Connect(ctx, dbDSN)
 	if err != nil {
 		log.Fatalf("failed to connect to database %v", err)
@@ -146,7 +140,7 @@ func (s *server) Delete(ctx context.Context, req *desc.DeleteUserRequest) (*empt
 
 	deleteBuilder := squirrel.Delete("\"user\"").
 		PlaceholderFormat(squirrel.Dollar).
-		Where(squirrel.Eq{"id": id})
+		Where(squirrel.Eq{"id": req.Id})
 
 	query, args, err := deleteBuilder.ToSql()
 	if err != nil {
