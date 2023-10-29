@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/jackc/pgx/v4"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -24,12 +25,12 @@ type server struct {
 
 func (s *server) Create(ctx context.Context, req *desc.CreateUserRequest) (*desc.CreateUserResponse, error) {
 	if req.User.Password != req.User.PasswordConfirm {
-		log.Fatalf("passwords are not equal")
+		return nil, errors.New("Passwords are not equal")
 	}
 
 	pool, err := pgx.Connect(ctx, dbDSN)
 	if err != nil {
-		log.Fatalf("failed to connect to database %v", err.Error())
+		return nil, errors.Wrapf(err, "Failed to connect to database %s", err)
 	}
 
 	insertBuilder := squirrel.Insert("\"user\"").
@@ -40,13 +41,13 @@ func (s *server) Create(ctx context.Context, req *desc.CreateUserRequest) (*desc
 
 	query, args, err := insertBuilder.ToSql()
 	if err != nil {
-		log.Fatalf("Failed to build query")
+		return nil, errors.Wrapf(err, "Failed to build query %s", err)
 	}
 
 	var id int64
 	err = pool.QueryRow(ctx, query, args...).Scan(&id)
 	if err != nil {
-		log.Fatalf("Failed to make query: %v", err.Error())
+		return nil, errors.Wrapf(err, "Failed to make query: %s", err)
 	}
 
 	return &desc.CreateUserResponse{
@@ -57,7 +58,7 @@ func (s *server) Create(ctx context.Context, req *desc.CreateUserRequest) (*desc
 func (s *server) Get(ctx context.Context, req *desc.GetUserRequest) (*desc.GetUserResponse, error) {
 	pool, err := pgx.Connect(ctx, dbDSN)
 	if err != nil {
-		log.Fatalf("Failed to connect to database")
+		return nil, errors.Wrapf(err, "Failed to connect to database %s", err)
 	}
 
 	selectBuilder := squirrel.Select("id", "name", "email", "role", "created_at", "updated_at").
@@ -67,7 +68,7 @@ func (s *server) Get(ctx context.Context, req *desc.GetUserRequest) (*desc.GetUs
 
 	query, args, err := selectBuilder.ToSql()
 	if err != nil {
-		log.Fatalf("Failed to build query")
+		return nil, errors.Wrapf(err, "Failed to build query %s", err)
 	}
 
 	var userId int64
@@ -78,7 +79,7 @@ func (s *server) Get(ctx context.Context, req *desc.GetUserRequest) (*desc.GetUs
 	var updatedAt *time.Time
 	err = pool.QueryRow(ctx, query, args...).Scan(&userId, &userName, &email, &role, &createdAt, &updatedAt)
 	if err != nil {
-		log.Fatalf("Failed to make query: %v", err.Error())
+		return nil, errors.Wrapf(err, "Failed to make query: %s", err)
 	}
 
 	user := &desc.GetUserResponse{
@@ -102,7 +103,7 @@ func (s *server) Update(ctx context.Context, req *desc.UpdateUserRequest) (*empt
 
 	pool, err := pgx.Connect(ctx, dbDSN)
 	if err != nil {
-		log.Fatalf("Failed to connect to database")
+		return nil, errors.Wrapf(err, "Failed to connect to database %s", err)
 	}
 
 	builderUpdate := squirrel.Update("\"user\"").
@@ -121,12 +122,12 @@ func (s *server) Update(ctx context.Context, req *desc.UpdateUserRequest) (*empt
 
 	query, args, err := builderUpdate.ToSql()
 	if err != nil {
-		log.Fatalf("failed to build query: %v", err)
+		return nil, errors.Wrapf(err, "Failed to build query: %s", err)
 	}
 
 	_, err = pool.Exec(ctx, query, args...)
 	if err != nil {
-		log.Fatalf("failed to executed query: %v", err)
+		return nil, errors.Wrapf(err, "Failed to executed query: %s", err)
 	}
 
 	return &empty.Empty{}, nil
@@ -135,7 +136,7 @@ func (s *server) Update(ctx context.Context, req *desc.UpdateUserRequest) (*empt
 func (s *server) Delete(ctx context.Context, req *desc.DeleteUserRequest) (*empty.Empty, error) {
 	pool, err := pgx.Connect(ctx, dbDSN)
 	if err != nil {
-		log.Fatalf("failed to connect to database %v", err)
+		return nil, errors.Wrapf(err, "Failed to connect to database %s", err)
 	}
 
 	deleteBuilder := squirrel.Delete("\"user\"").
@@ -144,11 +145,11 @@ func (s *server) Delete(ctx context.Context, req *desc.DeleteUserRequest) (*empt
 
 	query, args, err := deleteBuilder.ToSql()
 	if err != nil {
-		log.Fatalf("failed to build query %v", err)
+		return nil, errors.Wrapf(err, "Failed to build query %s", err)
 	}
 	_, err = pool.Exec(ctx, query, args...)
 	if err != nil {
-		log.Fatalf("failed to execute %v", err)
+		return nil, errors.Wrapf(err, "Failed to execute %s", err)
 	}
 
 	return &empty.Empty{}, nil
