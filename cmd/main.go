@@ -16,7 +16,7 @@ import (
 )
 
 const grpcPort = 50051
-const dbDSN = "host=localhost port=54321 dbname=course user=dev_course password=1801"
+const dbDSN = "host=localhost port=54321 dbname=auth-service user=dev-course password=1801 sslmode=disable"
 
 type server struct {
 	desc.UnimplementedUserV1Server
@@ -100,7 +100,9 @@ func (s *server) Get(ctx context.Context, req *desc.GetUserRequest) (*desc.GetUs
 }
 
 func (s *server) Update(ctx context.Context, req *desc.UpdateUserRequest) (*empty.Empty, error) {
-	id, email, name, role := req.Id, req.Email, req.Name, req.Role
+	if req.Email == nil && req.Name == nil && req.Role.Number() == 0 {
+		return &empty.Empty{}, nil
+	}
 
 	pool, err := pgx.Connect(ctx, dbDSN)
 	if err != nil {
@@ -109,11 +111,17 @@ func (s *server) Update(ctx context.Context, req *desc.UpdateUserRequest) (*empt
 
 	builderUpdate := squirrel.Update("\"user\"").
 		PlaceholderFormat(squirrel.Dollar).
-		Set("email", email.Value).
-		Set("name", name.Value).
-		Set("role", role.String()).
-		Set("updated_at", time.Now()).
-		Where(squirrel.Eq{"id": id})
+		Set("updated_at", time.Now())
+	if req.Email != nil {
+		builderUpdate = builderUpdate.Set("email", req.Email.Value)
+	}
+	if req.Name != nil {
+		builderUpdate = builderUpdate.Set("name", req.Name.Value)
+	}
+	if req.Role.Number() != 0 {
+		builderUpdate = builderUpdate.Set("role", req.Role.String())
+	}
+	builderUpdate = builderUpdate.Where(squirrel.Eq{"id": req.Id})
 
 	query, args, err := builderUpdate.ToSql()
 	if err != nil {
