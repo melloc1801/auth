@@ -12,6 +12,12 @@ import (
 	"log"
 )
 
+type key string
+
+const (
+	TxKey key = "tx"
+)
+
 type pg struct {
 	pool *pgxpool.Pool
 }
@@ -35,6 +41,11 @@ func (pg *pg) Exec(ctx context.Context, q db.Query, args ...interface{}) (pgconn
 	}
 
 	return res, nil
+}
+
+type MigrationQuery struct {
+	query db.Query
+	args  []interface{}
 }
 
 func (pg *pg) QueryOneRow(ctx context.Context, q db.Query, args ...interface{}) pgx.Row {
@@ -71,12 +82,20 @@ func (pg *pg) ScanAllRows(ctx context.Context, dest interface{}, q db.Query, arg
 	return pgxscan.ScanAll(dest, rows)
 }
 
+func (pg *pg) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
+	return pg.pool.BeginTx(ctx, txOptions)
+}
+
 func (pg *pg) Ping(ctx context.Context) error {
 	return pg.pool.Ping(ctx)
 }
 
 func (pg *pg) Close() {
 	defer pg.Close()
+}
+
+func MakeContextTx(ctx context.Context, tx pgx.Tx) context.Context {
+	return context.WithValue(ctx, TxKey, tx)
 }
 
 func logQuery(ctx context.Context, q db.Query, args ...interface{}) {
