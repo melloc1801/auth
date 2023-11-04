@@ -4,10 +4,12 @@ import (
 	"auth/internal/api"
 	"auth/internal/client/db"
 	"auth/internal/client/db/pg"
+	"auth/internal/client/db/transaction"
 	"auth/internal/closer"
 	"auth/internal/config"
 	"auth/internal/repository"
 	"auth/internal/repository/user"
+	"auth/internal/repository/user_log"
 	"auth/internal/service"
 	userService "auth/internal/service/user"
 	"context"
@@ -18,8 +20,10 @@ type serviceProvider struct {
 	pgConfig   config.PGConfig
 	grpcConfig config.GRPCConfig
 
-	pg             db.Client
-	userRepository repository.UserRepository
+	pg                db.Client
+	txManager         db.TxManager
+	userLogRepository repository.UserLogRepository
+	userRepository    repository.UserRepository
 
 	userService service.UserService
 
@@ -74,6 +78,22 @@ func (s *serviceProvider) DBClient(ctx context.Context) db.Client {
 	return s.pg
 }
 
+func (s *serviceProvider) TxManager(ctx context.Context) db.TxManager {
+	if s.txManager == nil {
+		s.txManager = transaction.NewTransactionManager(s.DBClient(ctx).DB())
+	}
+
+	return s.txManager
+}
+
+func (s *serviceProvider) UserLogRepository(ctx context.Context) repository.UserLogRepository {
+	if s.userLogRepository == nil {
+		s.userLogRepository = user_log.NewUserLogRepository(s.DBClient(ctx))
+	}
+
+	return s.userLogRepository
+}
+
 func (s *serviceProvider) UserRepository(ctx context.Context) repository.UserRepository {
 	if s.userRepository == nil {
 		s.userRepository = user.NewRepository(s.DBClient(ctx))
@@ -84,7 +104,7 @@ func (s *serviceProvider) UserRepository(ctx context.Context) repository.UserRep
 
 func (s *serviceProvider) UserService(ctx context.Context) service.UserService {
 	if s.userService == nil {
-		s.userService = userService.NewService(s.UserRepository(ctx))
+		s.userService = userService.NewService(s.TxManager(ctx), s.UserRepository(ctx), s.UserLogRepository(ctx))
 	}
 
 	return s.userService

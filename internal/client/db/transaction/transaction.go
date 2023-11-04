@@ -33,11 +33,12 @@ func (m *manager) transaction(ctx context.Context, opts pgx.TxOptions, fn db.Han
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.Wrapf(err, "panic recovered: %s", err)
+			err = errors.Errorf("panic recovered: %v", r)
 		}
 
 		if err != nil {
-			if errRollback := tx.Rollback(ctx); errRollback != nil {
+			errRollback := tx.Rollback(ctx)
+			if errRollback != nil {
 				err = errors.Wrapf(err, "failed to rollback transaction: %s", err)
 			}
 
@@ -49,13 +50,11 @@ func (m *manager) transaction(ctx context.Context, opts pgx.TxOptions, fn db.Han
 			if err != nil {
 				err = errors.Wrapf(err, "tx commit failed")
 			}
-
-			return
 		}
 	}()
 
 	if err = fn(ctx); err != nil {
-		return errors.Wrapf(err, "failed to execute tx func: %s", err)
+		err = errors.Wrapf(err, "failed to execute tx func: %s", err)
 	}
 
 	return err

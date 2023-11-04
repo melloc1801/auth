@@ -12,7 +12,18 @@ func (s serv) Create(ctx context.Context, createUserInfo *model.CreateUserInfo) 
 		return 0, errors.New("passwords should be equal")
 	}
 
-	userId, err := s.userRepository.Create(ctx, converter.ToCreateUserInfoFromService(createUserInfo))
+	var userId int64
+	err := s.txManager.ReadCommitted(ctx, func(ctx context.Context) error {
+		id, errTx := s.userRepository.Create(ctx, converter.ToCreateUserInfoFromService(createUserInfo))
+		if errTx != nil {
+			return errTx
+		}
+		userId = id
+
+		return errors.New("asd")
+
+		return s.userLogRepository.Create(ctx, "user_created")
+	})
 	if err != nil {
 		return 0, err
 	}
