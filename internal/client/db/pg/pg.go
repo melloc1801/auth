@@ -1,15 +1,17 @@
 package pg
 
 import (
-	"auth/internal/client/db"
-	"auth/internal/client/db/prettier"
 	"context"
 	"fmt"
+	"log"
+
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"log"
+
+	"auth/internal/client/db"
+	"auth/internal/client/db/prettier"
 )
 
 type key string
@@ -19,62 +21,30 @@ const (
 )
 
 type pg struct {
-	pool *pgxpool.Pool
+	dbc *pgxpool.Pool
 }
 
-func NewPg(ctx context.Context, dbDsn string) (db.DB, error) {
-	pool, err := pgxpool.Connect(ctx, dbDsn)
-	if err != nil {
-		return nil, err
-	}
+func NewDB(dbc *pgxpool.Pool) db.DB {
 	return &pg{
-		pool: pool,
-	}, nil
-}
-
-func (pg *pg) Exec(ctx context.Context, q db.Query, args ...interface{}) (pgconn.CommandTag, error) {
-	logQuery(ctx, q, args...)
-
-	res, err := pg.pool.Exec(ctx, q.QueryString, args...)
-	if err != nil {
-		return nil, err
+		dbc: dbc,
 	}
-
-	return res, nil
 }
 
-type MigrationQuery struct {
-	query db.Query
-	args  []interface{}
-}
-
-func (pg *pg) QueryOneRow(ctx context.Context, q db.Query, args ...interface{}) pgx.Row {
+func (p *pg) ScanOneContext(ctx context.Context, dest interface{}, q db.Query, args ...interface{}) error {
 	logQuery(ctx, q, args...)
 
-	return pg.pool.QueryRow(ctx, q.QueryString, args...)
-}
-
-func (pg *pg) QueryAllRows(ctx context.Context, q db.Query, args ...interface{}) (pgx.Rows, error) {
-	logQuery(ctx, q, args...)
-
-	return pg.pool.Query(ctx, q.QueryString, args)
-}
-
-func (pg *pg) ScanOneRow(ctx context.Context, dest interface{}, q db.Query, args ...interface{}) error {
-	logQuery(ctx, q, args...)
-
-	rows, err := pg.pool.Query(ctx, q.QueryString, args...)
+	row, err := p.QueryContext(ctx, q, args...)
 	if err != nil {
 		return err
 	}
 
-	return pgxscan.ScanOne(dest, rows)
+	return pgxscan.ScanOne(dest, row)
 }
 
-func (pg *pg) ScanAllRows(ctx context.Context, dest interface{}, q db.Query, args ...interface{}) error {
+func (p *pg) ScanAllContext(ctx context.Context, dest interface{}, q db.Query, args ...interface{}) error {
 	logQuery(ctx, q, args...)
 
-	rows, err := pg.pool.Query(ctx, q.QueryString, args...)
+	rows, err := p.QueryContext(ctx, q, args...)
 	if err != nil {
 		return err
 	}
@@ -82,16 +52,49 @@ func (pg *pg) ScanAllRows(ctx context.Context, dest interface{}, q db.Query, arg
 	return pgxscan.ScanAll(dest, rows)
 }
 
-func (pg *pg) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
-	return pg.pool.BeginTx(ctx, txOptions)
+func (p *pg) ExecContext(ctx context.Context, q db.Query, args ...interface{}) (pgconn.CommandTag, error) {
+	logQuery(ctx, q, args...)
+
+	tx, ok := ctx.Value(TxKey).(pgx.Tx)
+	if ok {
+		return tx.Exec(ctx, q.QueryRaw, args...)
+	}
+
+	return p.dbc.Exec(ctx, q.QueryRaw, args...)
 }
 
-func (pg *pg) Ping(ctx context.Context) error {
-	return pg.pool.Ping(ctx)
+func (p *pg) QueryContext(ctx context.Context, q db.Query, args ...interface{}) (pgx.Rows, error) {
+	logQuery(ctx, q, args...)
+
+	tx, ok := ctx.Value(TxKey).(pgx.Tx)
+	if ok {
+		return tx.Query(ctx, q.QueryRaw, args...)
+	}
+
+	return p.dbc.Query(ctx, q.QueryRaw, args...)
 }
 
-func (pg *pg) Close() {
-	defer pg.Close()
+func (p *pg) QueryRowContext(ctx context.Context, q db.Query, args ...interface{}) pgx.Row {
+	logQuery(ctx, q, args...)
+
+	tx, ok := ctx.Value(TxKey).(pgx.Tx)
+	if ok {
+		return tx.QueryRow(ctx, q.QueryRaw, args...)
+	}
+
+	return p.dbc.QueryRow(ctx, q.QueryRaw, args...)
+}
+
+func (p *pg) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
+	return p.dbc.BeginTx(ctx, txOptions)
+}
+
+func (p *pg) Ping(ctx context.Context) error {
+	return p.dbc.Ping(ctx)
+}
+
+func (p *pg) Close() {
+	p.dbc.Close()
 }
 
 func MakeContextTx(ctx context.Context, tx pgx.Tx) context.Context {
@@ -99,10 +102,10 @@ func MakeContextTx(ctx context.Context, tx pgx.Tx) context.Context {
 }
 
 func logQuery(ctx context.Context, q db.Query, args ...interface{}) {
-	prettyQuery := prettier.Pretty(q.QueryString, prettier.PlaceholderDollar, args...)
+	prettyQuery := prettier.Pretty(q.QueryRaw, prettier.PlaceholderDollar, args...)
 	log.Println(
-		fmt.Sprintf("context: %s \n", ctx),
-		fmt.Sprintf("sql: %s \n", q.Name),
-		fmt.Sprintf("query: %s \n", prettyQuery),
+		ctx,
+		fmt.Sprintf("sql: %s", q.Name),
+		fmt.Sprintf("query: %s", prettyQuery),
 	)
 }

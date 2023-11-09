@@ -1,25 +1,26 @@
 package pg
 
 import (
-	"auth/internal/client/db"
 	"context"
+
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/pkg/errors"
+
+	"auth/internal/client/db"
 )
 
 type pgClient struct {
 	masterDBC db.DB
 }
 
-func NewPgClient(ctx context.Context, dsn string) (db.Client, error) {
-	pool, err := pgxpool.Connect(ctx, dsn)
+func New(ctx context.Context, dsn string) (db.Client, error) {
+	dbc, err := pgxpool.Connect(ctx, dsn)
 	if err != nil {
-		return nil, nil
+		return nil, errors.Errorf("failed to connect to db: %v", err)
 	}
 
 	return &pgClient{
-		masterDBC: &pg{
-			pool: pool,
-		},
+		masterDBC: &pg{dbc: dbc},
 	}, nil
 }
 

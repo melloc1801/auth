@@ -1,14 +1,16 @@
 package user
 
 import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/Masterminds/squirrel"
+	"github.com/pkg/errors"
+
 	"auth/internal/client/db"
 	"auth/internal/repository"
 	"auth/internal/repository/user/model"
-	"context"
-	"fmt"
-	"github.com/Masterminds/squirrel"
-	"github.com/pkg/errors"
-	"time"
 )
 
 const (
@@ -47,7 +49,7 @@ func (r *repo) Create(ctx context.Context, userInfo *model.CreateUserInfo) (int6
 
 	var id int64
 
-	ro, err := r.db.DB().Exec(ctx, db.Query{Name: "Insert user", QueryString: query}, args...)
+	ro, err := r.db.DB().ExecContext(ctx, db.Query{Name: "Insert user", QueryRaw: query}, args...)
 	fmt.Println(ro)
 	if err != nil {
 		return 0, errors.New("failed to make query")
@@ -75,7 +77,7 @@ func (r *repo) Get(ctx context.Context, id int64) (*model.User, error) {
 	}
 
 	var user = &model.User{}
-	err = r.db.DB().ScanOneRow(ctx, user, db.Query{Name: "user_repository.Get", QueryString: query}, args...)
+	err = r.db.DB().ScanOneContext(ctx, user, db.Query{Name: "user_repository.Get", QueryRaw: query}, args...)
 	if err != nil {
 		return nil, errors.New("failed to make query")
 	}
@@ -97,7 +99,7 @@ func (r *repo) Update(ctx context.Context, updateUserInfo *model.UpdateUserInfo)
 		return errors.New("failed to build query")
 	}
 
-	_, err = r.db.DB().Exec(ctx, db.Query{Name: "user_repository.Update", QueryString: query}, args...)
+	_, err = r.db.DB().ExecContext(ctx, db.Query{Name: "user_repository.Update", QueryRaw: query}, args...)
 	if err != nil {
 		return errors.New("failed to executed query")
 	}
@@ -114,7 +116,7 @@ func (r *repo) Delete(ctx context.Context, id int64) error {
 	if err != nil {
 		return errors.New("failed to build query")
 	}
-	_, err = r.db.DB().Exec(ctx, db.Query{Name: "user_repository.Delete", QueryString: query}, args...)
+	_, err = r.db.DB().ExecContext(ctx, db.Query{Name: "user_repository.Delete", QueryRaw: query}, args...)
 	if err != nil {
 		return errors.New("failed to execute")
 	}

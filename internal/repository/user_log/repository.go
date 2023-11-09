@@ -1,11 +1,13 @@
 package user_log
 
 import (
-	"auth/internal/client/db"
-	"auth/internal/repository"
 	"context"
+
 	"github.com/Masterminds/squirrel"
 	"github.com/pkg/errors"
+
+	"auth/internal/client/db"
+	"auth/internal/repository"
 )
 
 const (
@@ -35,7 +37,7 @@ func (r repo) Create(ctx context.Context, message string) error {
 		return errors.Wrapf(err, "failed to build query: %s", err)
 	}
 
-	_, err = r.db.DB().Exec(ctx, db.Query{Name: "user_log_repository.Create", QueryString: query}, args...)
+	_, err = r.db.DB().ExecContext(ctx, db.Query{Name: "user_log_repository.Create", QueryRaw: query}, args...)
 	if err != nil {
 		return errors.Wrapf(err, "failed to make query: %s", err)
 	}

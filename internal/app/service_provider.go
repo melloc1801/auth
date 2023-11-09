@@ -1,6 +1,9 @@
 package app
 
 import (
+	"context"
+	"log"
+
 	"auth/internal/api"
 	"auth/internal/client/db"
 	"auth/internal/client/db/pg"
@@ -12,8 +15,6 @@ import (
 	"auth/internal/repository/user_log"
 	"auth/internal/service"
 	userService "auth/internal/service/user"
-	"context"
-	"log"
 )
 
 type serviceProvider struct {
@@ -60,7 +61,7 @@ func (s *serviceProvider) PgConfig() config.PGConfig {
 
 func (s *serviceProvider) DBClient(ctx context.Context) db.Client {
 	if s.pg == nil {
-		cl, err := pg.NewPgClient(ctx, s.PgConfig().DSN())
+		cl, err := pg.New(ctx, s.PgConfig().DSN())
 		if err != nil {
 			log.Fatalf("failed to connect to database: %v", err)
 		}
