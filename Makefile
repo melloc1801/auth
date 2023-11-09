@@ -36,13 +36,13 @@ build:
 	GOOS=linux GOARCH=amd64 go build -o bin/main cmd/main.go
 
 local-migration-status:
-	$(LOCAL_BIN)/goose -dir ${LOCAL_MIGRATION_DIR} postgres ${LOCAL_MIGRATION_DSN} status -v
+	$(LOCAL_BIN)/goose -dir ${MIGRATION_DR} postgres ${PG_DSN} status -v
 
 local-migration-up:
-	$(LOCAL_BIN)/goose -dir ${LOCAL_MIGRATION_DIR} postgres ${LOCAL_MIGRATION_DSN} up -v
+	$(LOCAL_BIN)/goose -dir ${MIGRATION_DR} postgres ${PG_DSN} up -v
 
 local-migration-down:
-	$(LOCAL_BIN)/goose -dir ${LOCAL_MIGRATION_DIR} postgres ${LOCAL_MIGRATION_DSN} down -v
+	$(LOCAL_BIN)/goose -dir ${MIGRATION_DR} postgres ${PG_DSN} down -v
 
 
 copy-to-server:
